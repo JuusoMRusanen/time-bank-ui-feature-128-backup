@@ -745,7 +745,6 @@ const EditorContent = () => {
           </TabList>
         </Box>
         <TabPanel value="1">
-          { renderFilter }
           { renderFilter() }
           { renderCharts() }
           { renderVacationDays() }

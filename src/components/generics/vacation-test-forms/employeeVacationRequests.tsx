@@ -8,7 +8,7 @@ import { CalendarPickerView } from "@mui/x-date-pickers";
 import strings from "localization/strings";
 import DateRangePicker from "../date-range-picker/date-range-picker";
 import { FilterScopes, VacationRequestSort } from "types";
-import { Person, VacationRequest, VacationRequestStatuses, VacationType } from "generated/client";
+import { Person, VacationRequest, VacationRequestStatus, VacationRequestStatuses, VacationType } from "generated/client";
 import Api from "api/api";
 import { useAppSelector } from "app/hooks";
 import { ErrorContext } from "components/error-handler/error-handler";
@@ -68,6 +68,7 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
   const { accessToken } = useAppSelector(selectAuth);
   const context = useContext(ErrorContext);
   const [ requests, setRequests ] = useState<VacationRequest[]>([]);
+  const [ statuses, setStatuses ] = useState<VacationRequestStatus[]>([]);
   const [ openRows, setOpenRows ] = useState<boolean[]>([]);
   const [sortBy, setSortBy] = useState<VacationRequestSort>(VacationRequestSort.START_DATE);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -80,6 +81,27 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
       const vacationsApi = Api.getVacationRequestsApi(accessToken?.access_token);
       const vacations = await vacationsApi.listVacationRequests({});
       setRequests(vacations);
+      /* REMOVE THIS FOR PRODUCTION */
+      /* Create statuses for existing vacations requests */
+      // vacations.forEach(vacation => {
+      //   try {
+      //     const applyApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
+    
+      //     const createdStatus = await applyApi.createVacationRequestStatus({
+      //       id: vacation.id!,
+      //       vacationRequestStatus: {
+      //         vacationRequestId: vacation.id,
+      //         status: VacationRequestStatuses.PENDING,
+      //         message: vacation.message,
+      //         createdAt: new Date(),
+      //         createdBy: "someone",
+      //         updatedAt: new Date(),
+      //         updatedBy: "someone"
+      //       }
+      //     });
+    
+      //     setStatuses([...statuses, createdStatus]);
+      // });
     } catch (error) {
       context.setError(strings.errorHandling.fetchVacationDataFailed, error);
     }
@@ -91,6 +113,38 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
     }
     initializeRequests();
   }, [person]);
+
+  /**
+   * Initializes all vacation request statuses
+   */
+  const initializeRequestStatuses = async () => {
+    if (!person) return;
+
+    try {
+      const vacationRequestStatuses: VacationRequestStatus[] = [];
+
+      const statusesApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
+
+      await Promise.all(requests.map(async request => {
+        const createdStatuses = await statusesApi.listVacationRequestStatuses({ id: request.id! });
+        createdStatuses.forEach(createdStatus => {
+          vacationRequestStatuses.push(createdStatus);
+        });
+      }));
+
+      setStatuses(vacationRequestStatuses);
+    } catch (error) {
+      context.setError(strings.errorHandling.fetchVacationDataFailed, error);
+    }
+  };
+
+  useEffect(() => {
+    if (requests.length <= 0) {
+      console.log("requests empty!");
+      return;
+    }
+    initializeRequestStatuses();
+  }, [requests]);
 
   /**
    * Handle employee change
@@ -383,20 +437,20 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
     }
   };
 
-  // /**
-  //  * Handle request status
-  //  *
-  //  * @param requestStatus Vacation request status
-  //  */
-  // const handleRequestStatus = (requestStatus: VacationRequestStatuses) => {
-  //   const statusMap = {
-  //     [VacationRequestStatuses.PENDING]: strings.vacationRequests.pending,
-  //     [VacationRequestStatuses.APPROVED]: strings.vacationRequests.approved,
-  //     [VacationRequestStatuses.DECLINED]: strings.vacationRequests.declined
-  //   };
+  /**
+   * Handle request status
+   *
+   * @param requestStatus Vacation request status
+   */
+  const handleRequestStatus = (requestStatus: VacationRequestStatuses) => {
+    const statusMap = {
+      [VacationRequestStatuses.PENDING]: strings.vacationRequests.pending,
+      [VacationRequestStatuses.APPROVED]: strings.vacationRequests.approved,
+      [VacationRequestStatuses.DECLINED]: strings.vacationRequests.declined
+    };
 
-  //   return statusMap[requestStatus] || "";
-  // };
+    return statusMap[requestStatus] || "";
+  };
 
   return (
     <Box className={classes.employeeVacationRequests}>
@@ -567,6 +621,19 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
                     >
                       {handleRequestStatus(request.hrManagerStatus)}
                     </StyledTableCell> */}
+                    {statuses.map((vacationRequestStatus: VacationRequestStatus) => (
+                      <>
+                        {request.id === vacationRequestStatus.vacationRequestId &&
+                          <TableCell
+                            key={`status-${vacationRequestStatus.id}`}
+                            sx={{ "&.pending": { color: "#FF493C" }, "&.approved": { color: "#45cf36" } }}
+                            className={vacationRequestStatus.status === "APPROVED" ? "approved" : "pending"}
+                          >
+                            { handleRequestStatus(vacationRequestStatus.status) }
+                          </TableCell>
+                        }
+                      </>
+                    ))}
                     <StyledTableCell>
                       <IconButton
                         aria-label="expand row"
