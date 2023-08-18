@@ -50,6 +50,8 @@ const RenderVacationRequests = () => {
     if (!person) return;
 
     try {
+      console.log(person.keycloakId);
+
       const vacationsApi = Api.getVacationRequestsApi(accessToken?.access_token);
       const vacations = await vacationsApi.listVacationRequests({ personId: person.keycloakId });
       setRequests(vacations);
@@ -91,7 +93,6 @@ const RenderVacationRequests = () => {
 
   useEffect(() => {
     if (requests.length <= 0) {
-      console.log("requests empty!");
       return;
     }
     initializeRequestStatuses();
@@ -158,8 +159,6 @@ const RenderVacationRequests = () => {
       });
 
       setStatuses([...statuses, createdStatus]);
-
-      console.log([...statuses, createdStatus]);
     } catch (error) {
       context.setError(strings.errorHandling.fetchVacationDataFailed, error);
     }

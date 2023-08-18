@@ -1,7 +1,7 @@
 import { Box, Button, Collapse, FormControl, IconButton, InputLabel, MenuItem, Select, SelectChangeEvent, styled, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import useEditorContentStyles from "styles/editor-content/editor-content";
 import theme from "theme/theme";
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { CalendarPickerView } from "@mui/x-date-pickers";
@@ -9,7 +9,7 @@ import strings from "localization/strings";
 import DateRangePicker from "../date-range-picker/date-range-picker";
 import { FilterScopes, VacationRequestSort } from "types";
 import { Person, VacationRequest, VacationRequestStatus, VacationRequestStatuses, VacationType } from "generated/client";
-import Api from "api/api";
+// import Api from "api/api";
 import { useAppSelector } from "app/hooks";
 import { ErrorContext } from "components/error-handler/error-handler";
 import { selectPerson } from "features/person/person-slice";
@@ -72,39 +72,86 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
   const [ openRows, setOpenRows ] = useState<boolean[]>([]);
   const [sortBy, setSortBy] = useState<VacationRequestSort>(VacationRequestSort.START_DATE);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [ loading, setLoading ] = useState<boolean>(false);
+  const [ approvalChanged, setApprovalChanged ] = useState<boolean>(false);
+
+  // /**
+  // * Interface for createVacationRequestStatus properties
+  // */
+  // interface createVacationRequestStatusProps {
+  //   createdRequestId: string | undefined
+  // }
+  
+  // /**
+  // * Handle vacation apply button
+  // * Sends vacation request to database
+  // */
+  // const createVacationRequestStatus = async (props: createVacationRequestStatusProps) => {
+  //   // if (!person || !person.keycloakId) {
+  //   //   console.log("no person keycloakId");
+  //   //   return;
+  //   // }
+    
+  //   try {
+  //     const applyApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
+
+  //     const createdStatus = await applyApi.createVacationRequestStatus({
+  //       id: props.createdRequestId!,
+  //       vacationRequestStatus: {
+  //         vacationRequestId: props.createdRequestId,
+  //         status: VacationRequestStatuses.PENDING,
+  //         message: "Pliiiis...",
+  //         createdAt: new Date(),
+  //         createdBy: "c737fe03-1491-4d33-a102-7b4770d05866",
+  //         updatedAt: new Date(),
+  //         updatedBy: "c737fe03-1491-4d33-a102-7b4770d05866"
+  //       }
+  //     });
+
+  //     console.log("creating a new vacation request status");
+
+  //     setStatuses([...statuses, createdStatus]);
+  //   } catch (error) {
+  //     context.setError(strings.errorHandling.fetchVacationDataFailed, error);
+  //   }
+  // };
 
   /**
    * Initializes all vacation requests
    */
   const initializeRequests = async () => {
-    try {
-      const vacationsApi = Api.getVacationRequestsApi(accessToken?.access_token);
-      const vacations = await vacationsApi.listVacationRequests({});
-      setRequests(vacations);
-      /* REMOVE THIS FOR PRODUCTION */
-      /* Create statuses for existing vacations requests */
-      // vacations.forEach(vacation => {
-      //   try {
-      //     const applyApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
-    
-      //     const createdStatus = await applyApi.createVacationRequestStatus({
-      //       id: vacation.id!,
-      //       vacationRequestStatus: {
-      //         vacationRequestId: vacation.id,
-      //         status: VacationRequestStatuses.PENDING,
-      //         message: vacation.message,
-      //         createdAt: new Date(),
-      //         createdBy: "someone",
-      //         updatedAt: new Date(),
-      //         updatedBy: "someone"
-      //       }
-      //     });
-    
-      //     setStatuses([...statuses, createdStatus]);
-      // });
-    } catch (error) {
-      context.setError(strings.errorHandling.fetchVacationDataFailed, error);
+    // try {
+    //   const vacationsApi = Api.getVacationRequestsApi(accessToken?.access_token);
+    //   const vacations = await vacationsApi.listVacationRequests({});
+
+    //   setRequests(vacations);
+    // } catch (error) {
+    //   context.setError(strings.errorHandling.fetchVacationDataFailed, error);
+    // }
+
+    /* Request mockdata generator */
+    /**
+     * Test Person class
+     *
+     * @param class test person
+     */
+    const testVacationRequests: VacationRequest[] = [];
+    for (let i = 0; i < 30; i++) {
+      const vacationRequest: VacationRequest = {
+        id: i.toString(),
+        personId: "c737fe03-1491-4d33-a102-7b4770d05866",
+        createdBy: "c737fe03-1491-4d33-a102-7b4770d05866",
+        startDate: new Date(),
+        endDate: new Date(),
+        type: VacationType.VACATION,
+        message: "Pliiis...",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        days: 1
+      };
+      testVacationRequests.push(vacationRequest);
     }
+    setRequests(testVacationRequests);
   };
 
   useEffect(() => {
@@ -118,21 +165,44 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
    * Initializes all vacation request statuses
    */
   const initializeRequestStatuses = async () => {
-    if (!person) return;
+    // if (!person) {
+    //   console.log("no person or person keycloakId");
+    //   return;
+    // }
 
     try {
       const vacationRequestStatuses: VacationRequestStatus[] = [];
 
-      const statusesApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
+      /* Status mockdata generator */
+      requests.forEach((request, index) => {
+        const createdStatus: VacationRequestStatus = {
+          id: index.toString(),
+          vacationRequestId: request.id,
+          status: VacationRequestStatuses.PENDING,
+          message: "Pliiiis...",
+          createdAt: new Date(),
+          createdBy: "c737fe03-1491-4d33-a102-7b4770d05866",
+          updatedAt: new Date(),
+          updatedBy: "c737fe03-1491-4d33-a102-7b4770d05866"
+        };
+        vacationRequestStatuses.push(createdStatus);
+      });
 
-      await Promise.all(requests.map(async request => {
-        const createdStatuses = await statusesApi.listVacationRequestStatuses({ id: request.id! });
-        createdStatuses.forEach(createdStatus => {
-          vacationRequestStatuses.push(createdStatus);
-        });
-      }));
+      // const statusesApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
+
+      // await Promise.all(requests.map(async request => {
+      //   const createdStatuses = await statusesApi.listVacationRequestStatuses({ id: request.id! });
+      //   createdStatuses.forEach(createdStatus => {
+      //     vacationRequestStatuses.push(createdStatus);
+      //   });
+      // }));
 
       setStatuses(vacationRequestStatuses);
+
+      // await Promise.all(requests.map(async request => {
+      //   await createVacationRequestStatus({ createdRequestId: request.id });
+      // }));
+      setLoading(false);
     } catch (error) {
       context.setError(strings.errorHandling.fetchVacationDataFailed, error);
     }
@@ -140,7 +210,6 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
 
   useEffect(() => {
     if (requests.length <= 0) {
-      console.log("requests empty!");
       return;
     }
     initializeRequestStatuses();
@@ -347,12 +416,12 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
    * @param id
    * @returns foundPerson.firstName and foundPerson.lastName
    */
-  const handlePersonNames = (id: number) => {
-    const foundPerson = persons.find(p => p.id === id);
+  const handlePersonNames = (id: string) => {
+    const foundPerson = persons.find(p => p.keycloakId === id);
     if (foundPerson) {
       return `${foundPerson.firstName} ${foundPerson.lastName}`;
     }
-    return "";
+    return "null";
   };
 
   /**
@@ -451,6 +520,68 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
 
     return statusMap[requestStatus] || "";
   };
+
+  const myRef = useRef<any>();
+
+  interface handleClickProps {
+    approved: boolean,
+    requestId: string | undefined
+  }
+  /**
+   * Handle request status on click
+   *
+   * @param click status handle
+   */
+  const handleClick = (props: handleClickProps) => {
+    const selectedStatusIndex = statuses.findIndex(s => s.vacationRequestId === props.requestId);
+    const selectedStatusObject = statuses.find(s => s.vacationRequestId === props.requestId);
+    if (props.approved && selectedStatusObject?.status && myRef.current) {
+      selectedStatusObject.status = VacationRequestStatuses.APPROVED;
+      myRef.current.className = "approved";
+    }
+    if (!props.approved && selectedStatusObject?.status && myRef.current) {
+      selectedStatusObject.status = VacationRequestStatuses.DECLINED;
+      myRef.current.className = "declined";
+    }
+    statuses[selectedStatusIndex] = selectedStatusObject!;
+    console.log(selectedStatusObject);
+
+    if (approvalChanged) {
+      setApprovalChanged(false);
+    } else {
+      setApprovalChanged(true);
+    }
+  };
+
+  interface StatusTableCellProps {
+    requestStatusId: string | undefined,
+    requestStatus: VacationRequestStatuses,
+    approvalChanged: boolean
+  }
+  
+  /**
+   * Handle request status on click
+   *
+   * @param type status component
+   */
+  function StatusTableCell(props: StatusTableCellProps) {
+    const { requestStatusId, requestStatus } = props;
+    const [ statusText, setStatusText ] = useState<string>(handleRequestStatus(requestStatus));
+
+    useEffect(() => {
+      setStatusText(handleRequestStatus(requestStatus));
+    }, [approvalChanged]);
+    return (
+      <StyledTableCell
+        ref={myRef}
+        key={`status-${requestStatusId}`}
+        sx={{ "&.pending": { color: "#FF493C" }, "&.approved": { color: "#45cf36" } }}
+        className={requestStatus === "APPROVED" ? "approved" : "pending"}
+      >
+        { statusText }
+      </StyledTableCell>
+    );
+  }
 
   return (
     <Box className={classes.employeeVacationRequests}>
@@ -605,14 +736,15 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {sortedVacationRequests.map((request: VacationRequest, index: number) => (
+              {!loading && sortedVacationRequests.map((request: VacationRequest, index: number) => (
                 <>
                   <StyledTableRow key={ request.id }>
                     <StyledTableCell component="th" scope="row">{ handleRequestType(request.type)}</StyledTableCell>
-                    <StyledTableCell>{ handlePersonNames(Number(request.personId)) }</StyledTableCell>
+                    <StyledTableCell>{ handlePersonNames(request.personId!) }</StyledTableCell>
                     <StyledTableCell>{ request.days }</StyledTableCell>
                     <StyledTableCell>{ request.startDate.toDateString() }</StyledTableCell>
                     <StyledTableCell>{ request.endDate.toDateString() }</StyledTableCell>
+                    <StyledTableCell>0</StyledTableCell>
                     {/* TODO: NEeds fixing */}
                     {/* <StyledTableCell>{ handleRemainingVacationDays(request)}</StyledTableCell> */}
                     {/* <StyledTableCell
@@ -624,13 +756,11 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
                     {statuses.map((vacationRequestStatus: VacationRequestStatus) => (
                       <>
                         {request.id === vacationRequestStatus.vacationRequestId &&
-                          <TableCell
-                            key={`status-${vacationRequestStatus.id}`}
-                            sx={{ "&.pending": { color: "#FF493C" }, "&.approved": { color: "#45cf36" } }}
-                            className={vacationRequestStatus.status === "APPROVED" ? "approved" : "pending"}
-                          >
-                            { handleRequestStatus(vacationRequestStatus.status) }
-                          </TableCell>
+                          <StatusTableCell
+                            requestStatus={vacationRequestStatus.status}
+                            requestStatusId={vacationRequestStatus.id}
+                            approvalChanged={approvalChanged}
+                          />
                         }
                       </>
                     ))}
@@ -688,6 +818,12 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
                                     variant="outlined"
                                     color="error"
                                     sx={{ color: "#F9473B" }}
+                                    onClick={() => {
+                                      handleClick({
+                                        approved: false,
+                                        requestId: request.id
+                                      });
+                                    }}
                                   >
                                     { strings.vacationRequests.declined }
                                   </Button>
@@ -697,6 +833,12 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
                                     variant="outlined"
                                     color="success"
                                     sx={{ color: "green" }}
+                                    onClick={() => {
+                                      handleClick({
+                                        approved: true,
+                                        requestId: request.id
+                                      });
+                                    }}
                                   >
                                     { strings.vacationRequests.approved }
                                   </Button>
