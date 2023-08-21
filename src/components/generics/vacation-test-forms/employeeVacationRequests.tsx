@@ -9,13 +9,13 @@ import strings from "localization/strings";
 import DateRangePicker from "../date-range-picker/date-range-picker";
 import { FilterScopes, VacationRequestSort } from "types";
 import { Person, VacationRequest, VacationRequestStatus, VacationRequestStatuses, VacationType } from "generated/client";
-// import Api from "api/api";
 import { useAppSelector } from "app/hooks";
 import { ErrorContext } from "components/error-handler/error-handler";
 import { selectPerson } from "features/person/person-slice";
 import { selectAuth } from "features/auth/auth-slice";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import Api from "api/api";
 
 /**
  * Component properties
@@ -69,89 +69,29 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
   const context = useContext(ErrorContext);
   const [ requests, setRequests ] = useState<VacationRequest[]>([]);
   const [ statuses, setStatuses ] = useState<VacationRequestStatus[]>([]);
+  const [ latestRequestStatuses, setLatestRequestStatuses ] = useState<VacationRequestStatus[]>([]);
   const [ openRows, setOpenRows ] = useState<boolean[]>([]);
   const [sortBy, setSortBy] = useState<VacationRequestSort>(VacationRequestSort.START_DATE);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [ loading, setLoading ] = useState<boolean>(false);
   const [ approvalChanged, setApprovalChanged ] = useState<boolean>(false);
-
-  // /**
-  // * Interface for createVacationRequestStatus properties
-  // */
-  // interface createVacationRequestStatusProps {
-  //   createdRequestId: string | undefined
-  // }
-  
-  // /**
-  // * Handle vacation apply button
-  // * Sends vacation request to database
-  // */
-  // const createVacationRequestStatus = async (props: createVacationRequestStatusProps) => {
-  //   // if (!person || !person.keycloakId) {
-  //   //   console.log("no person keycloakId");
-  //   //   return;
-  //   // }
-    
-  //   try {
-  //     const applyApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
-
-  //     const createdStatus = await applyApi.createVacationRequestStatus({
-  //       id: props.createdRequestId!,
-  //       vacationRequestStatus: {
-  //         vacationRequestId: props.createdRequestId,
-  //         status: VacationRequestStatuses.PENDING,
-  //         message: "Pliiiis...",
-  //         createdAt: new Date(),
-  //         createdBy: "c737fe03-1491-4d33-a102-7b4770d05866",
-  //         updatedAt: new Date(),
-  //         updatedBy: "c737fe03-1491-4d33-a102-7b4770d05866"
-  //       }
-  //     });
-
-  //     console.log("creating a new vacation request status");
-
-  //     setStatuses([...statuses, createdStatus]);
-  //   } catch (error) {
-  //     context.setError(strings.errorHandling.fetchVacationDataFailed, error);
-  //   }
-  // };
+  const myRef = useRef<any>();
 
   /**
    * Initializes all vacation requests
    */
   const initializeRequests = async () => {
-    // try {
-    //   const vacationsApi = Api.getVacationRequestsApi(accessToken?.access_token);
-    //   const vacations = await vacationsApi.listVacationRequests({});
+    try {
+      const vacationsApi = Api.getVacationRequestsApi(accessToken?.access_token);
 
-    //   setRequests(vacations);
-    // } catch (error) {
-    //   context.setError(strings.errorHandling.fetchVacationDataFailed, error);
-    // }
+      // Hardcoded personId for testing purposes, use person.keyCloakId for staging 
+      const vacations = await vacationsApi.listVacationRequests({ personId: "eeb18958-9644-4a6d-bc4d-7b250fc90f4f" });
+      // const vacations = await vacationsApi.listVacationRequests({ personId: person?.keycloakId });
 
-    /* Request mockdata generator */
-    /**
-     * Test Person class
-     *
-     * @param class test person
-     */
-    const testVacationRequests: VacationRequest[] = [];
-    for (let i = 0; i < 30; i++) {
-      const vacationRequest: VacationRequest = {
-        id: i.toString(),
-        personId: "c737fe03-1491-4d33-a102-7b4770d05866",
-        createdBy: "c737fe03-1491-4d33-a102-7b4770d05866",
-        startDate: new Date(),
-        endDate: new Date(),
-        type: VacationType.VACATION,
-        message: "Pliiis...",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        days: 1
-      };
-      testVacationRequests.push(vacationRequest);
+      setRequests(vacations);
+    } catch (error) {
+      context.setError(strings.errorHandling.fetchVacationDataFailed, error);
     }
-    setRequests(testVacationRequests);
   };
 
   useEffect(() => {
@@ -172,36 +112,16 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
 
     try {
       const vacationRequestStatuses: VacationRequestStatus[] = [];
+      const statusesApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
 
-      /* Status mockdata generator */
-      requests.forEach((request, index) => {
-        const createdStatus: VacationRequestStatus = {
-          id: index.toString(),
-          vacationRequestId: request.id,
-          status: VacationRequestStatuses.PENDING,
-          message: "Pliiiis...",
-          createdAt: new Date(),
-          createdBy: "c737fe03-1491-4d33-a102-7b4770d05866",
-          updatedAt: new Date(),
-          updatedBy: "c737fe03-1491-4d33-a102-7b4770d05866"
-        };
-        vacationRequestStatuses.push(createdStatus);
-      });
-
-      // const statusesApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
-
-      // await Promise.all(requests.map(async request => {
-      //   const createdStatuses = await statusesApi.listVacationRequestStatuses({ id: request.id! });
-      //   createdStatuses.forEach(createdStatus => {
-      //     vacationRequestStatuses.push(createdStatus);
-      //   });
-      // }));
+      await Promise.all(requests.map(async request => {
+        const createdStatuses = await statusesApi.listVacationRequestStatuses({ id: request.id! });
+        createdStatuses.forEach(createdStatus => {
+          vacationRequestStatuses.push(createdStatus);
+        });
+      }));
 
       setStatuses(vacationRequestStatuses);
-
-      // await Promise.all(requests.map(async request => {
-      //   await createVacationRequestStatus({ createdRequestId: request.id });
-      // }));
       setLoading(false);
     } catch (error) {
       context.setError(strings.errorHandling.fetchVacationDataFailed, error);
@@ -214,6 +134,39 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
     }
     initializeRequestStatuses();
   }, [requests]);
+
+  /**
+   * Initializes all the latest vacation request statuses, so there would be only one status for each request showed on the UI
+   */
+  const initializeLatestStatuses = async () => {
+    const latestStatuses: VacationRequestStatus[] = [];
+
+    requests.forEach(request => {
+      const requestStatuses: VacationRequestStatus[] = [];
+  
+      // Get statuses for this particular request
+      statuses.forEach(status1 => {
+        if (request.id === status1.vacationRequestId) {
+          requestStatuses.push(status1);
+        }
+      });
+  
+      // Pick the latest statuses
+      if (requestStatuses.length > 0) {
+        const pickedStatus = requestStatuses.reduce((a, b) => (a.updatedAt! > b.updatedAt! ? a : b));
+        latestStatuses.push(pickedStatus);
+      }
+    });
+
+    setLatestRequestStatuses(latestStatuses);
+  };
+
+  useEffect(() => {
+    if (statuses.length <= 0) {
+      return;
+    }
+    initializeLatestStatuses();
+  }, [statuses]);
 
   /**
    * Handle employee change
@@ -521,30 +474,63 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
     return statusMap[requestStatus] || "";
   };
 
-  const myRef = useRef<any>();
+  /**
+   * Handle request status change
+   * @param requestId id of vacation status request
+   * @param newStatus new selected status from status types
+   */
+  const updateVacationRequestStatus = async (selectedStatusObject: VacationRequestStatus, newStatus: VacationRequestStatuses) => {
+    // if (!person || !selectedStatusObject) {
+    //   console.log("no person or selectedStatusObject");
+    //   return;
+    // }
 
-  interface handleClickProps {
-    approved: boolean,
-    requestId: string | undefined
-  }
+    if (!selectedStatusObject) {
+      return;
+    }
+
+    try {
+      const updateApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
+      const updatedRequestStatus = await updateApi.updateVacationRequestStatus({
+        id: selectedStatusObject.id!,
+        statusId: selectedStatusObject.id!,
+        vacationRequestStatus: {
+          ...selectedStatusObject,
+          status: newStatus,
+          vacationRequestId: selectedStatusObject.vacationRequestId,
+          createdAt: selectedStatusObject.createdAt,
+          createdBy: selectedStatusObject.createdBy,
+          message: selectedStatusObject.message,
+          updatedAt: selectedStatusObject.updatedAt,
+          updatedBy: selectedStatusObject.updatedBy
+        }
+      });
+
+      const update = latestRequestStatuses.map(requestStatus => (requestStatus.id !== selectedStatusObject.id ? requestStatus : updatedRequestStatus));
+      setLatestRequestStatuses(update);
+    } catch (error) {
+      context.setError(strings.errorHandling.fetchVacationDataFailed, error);
+    }
+  };
+
   /**
    * Handle request status on click
    *
-   * @param click status handle
    */
-  const handleClick = (props: handleClickProps) => {
-    const selectedStatusIndex = statuses.findIndex(s => s.vacationRequestId === props.requestId);
-    const selectedStatusObject = statuses.find(s => s.vacationRequestId === props.requestId);
-    if (props.approved && selectedStatusObject?.status && myRef.current) {
+  const handleClick = (approved: boolean, requestId: string | undefined) => {
+    const selectedStatusIndex = latestRequestStatuses.findIndex(s => s.vacationRequestId === requestId);
+    const selectedStatusObject = latestRequestStatuses.find(s => s.vacationRequestId === requestId);
+    if (approved && selectedStatusObject?.status && myRef.current) {
       selectedStatusObject.status = VacationRequestStatuses.APPROVED;
       myRef.current.className = "approved";
+      updateVacationRequestStatus(selectedStatusObject, selectedStatusObject.status);
     }
-    if (!props.approved && selectedStatusObject?.status && myRef.current) {
+    if (!approved && selectedStatusObject?.status && myRef.current) {
       selectedStatusObject.status = VacationRequestStatuses.DECLINED;
       myRef.current.className = "declined";
+      updateVacationRequestStatus(selectedStatusObject, selectedStatusObject.status);
     }
-    statuses[selectedStatusIndex] = selectedStatusObject!;
-    console.log(selectedStatusObject);
+    latestRequestStatuses[selectedStatusIndex] = selectedStatusObject!;
 
     if (approvalChanged) {
       setApprovalChanged(false);
@@ -753,7 +739,7 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
                     >
                       {handleRequestStatus(request.hrManagerStatus)}
                     </StyledTableCell> */}
-                    {statuses.map((vacationRequestStatus: VacationRequestStatus) => (
+                    {latestRequestStatuses.map((vacationRequestStatus: VacationRequestStatus) => (
                       <>
                         {request.id === vacationRequestStatus.vacationRequestId &&
                           <StatusTableCell
@@ -819,10 +805,7 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
                                     color="error"
                                     sx={{ color: "#F9473B" }}
                                     onClick={() => {
-                                      handleClick({
-                                        approved: false,
-                                        requestId: request.id
-                                      });
+                                      handleClick(false, request.id);
                                     }}
                                   >
                                     { strings.vacationRequests.declined }
@@ -834,10 +817,7 @@ const RenderEmployeeVacationRequests = ({ persons }: Props) => {
                                     color="success"
                                     sx={{ color: "green" }}
                                     onClick={() => {
-                                      handleClick({
-                                        approved: true,
-                                        requestId: request.id
-                                      });
+                                      handleClick(true, request.id);
                                     }}
                                   >
                                     { strings.vacationRequests.approved }

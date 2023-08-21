@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Collapse, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Box } from "@mui/material";
 import useEditorContentStyles from "styles/editor-content/editor-content";
 import theme from "theme/theme";
@@ -28,6 +28,7 @@ const RenderVacationRequests = () => {
   const context = useContext(ErrorContext);
   const [ requests, setRequests ] = useState<VacationRequest[]>([]);
   const [ statuses, setStatuses ] = useState<VacationRequestStatus[]>([]);
+  const [ latestRequestStatuses, setLatestRequestStatuses ] = useState<VacationRequestStatus[]>([]);
   const [vacationRequest, setVacationRequest] = useState<VacationData>({
     startDate: new Date(),
     endDate: new Date(),
@@ -50,10 +51,13 @@ const RenderVacationRequests = () => {
     if (!person) return;
 
     try {
-      console.log(person.keycloakId);
-
       const vacationsApi = Api.getVacationRequestsApi(accessToken?.access_token);
-      const vacations = await vacationsApi.listVacationRequests({ personId: person.keycloakId });
+      // Hardcoded personId for testing purposes, use person.keyCloakId for staging
+      // Use your own keyCloakId, if you wish to display vacation requests created by you
+      // It is currently a limitation of the TimeBankApi. It puts your keyCloakId in the
+      // vacation request when creating a new vacation request, regardless of the Id you use here
+      const vacations = await vacationsApi.listVacationRequests({ personId: "eeb18958-9644-4a6d-bc4d-7b250fc90f4f" });
+      // const vacations = await vacationsApi.listVacationRequests({ personId: person.keycloakId });
       setRequests(vacations);
     } catch (error) {
       context.setError(strings.errorHandling.fetchVacationDataFailed, error);
@@ -99,6 +103,39 @@ const RenderVacationRequests = () => {
   }, [requests]);
 
   /**
+   * Initializes all the latest vacation request statuses, so there would be only one status for each request showed on the UI
+   */
+  const initializeLatestStatuses = async () => {
+    const latestStatuses: VacationRequestStatus[] = [];
+
+    requests.forEach(request => {
+      const requestStatuses: VacationRequestStatus[] = [];
+  
+      // Get statuses for this particular request
+      statuses.forEach(status => {
+        if (request.id === status.vacationRequestId) {
+          requestStatuses.push(status);
+        }
+      });
+  
+      // Pick the latest statuses
+      if (requestStatuses.length > 0) {
+        const pickedStatus = requestStatuses.reduce((a, b) => (a.updatedAt! > b.updatedAt! ? a : b));
+        latestStatuses.push(pickedStatus);
+      }
+    });
+
+    setLatestRequestStatuses(latestStatuses);
+  };
+
+  useEffect(() => {
+    if (statuses.length <= 0) {
+      return;
+    }
+    initializeLatestStatuses();
+  }, [statuses]);
+
+  /**
  * Handle opening and closing details and edit
  *
  * @param index index of the request
@@ -129,26 +166,22 @@ const RenderVacationRequests = () => {
     newOpenRows[index] = !newOpenRows[index];
     setOpenEdit(newOpenRows);
   };
-  /**
-  * Interface for createVacationRequestStatus properties
-  */
-  interface createVacationRequestStatusProps {
-    createdRequestId: string | undefined
-  }
+
   /**
   * Handle vacation apply button
   * Sends vacation request to database
+  * @param createdRequestId id of newly created vacation request
   */
-  const createVacationRequestStatus = async (props: createVacationRequestStatusProps) => {
+  const createVacationRequestStatus = async (createdRequestId: string | undefined) => {
     if (!person || !person.keycloakId) return;
     
     try {
       const applyApi = Api.getVacationRequestStatusApi(accessToken?.access_token);
 
       const createdStatus = await applyApi.createVacationRequestStatus({
-        id: props.createdRequestId!,
+        id: createdRequestId!,
         vacationRequestStatus: {
-          vacationRequestId: props.createdRequestId,
+          vacationRequestId: createdRequestId,
           status: VacationRequestStatuses.PENDING,
           message: vacationRequest.message,
           createdAt: new Date(),
@@ -188,12 +221,12 @@ const RenderVacationRequests = () => {
       });
 
       setRequests([...requests, createdRequest]);
-
-      createVacationRequestStatus({ createdRequestId: createdRequest.id });
+      createVacationRequestStatus(createdRequest.id);
     } catch (error) {
       context.setError(strings.errorHandling.fetchVacationDataFailed, error);
     }
   };
+
   /**
    * Updates the vacation request
    *
@@ -293,7 +326,7 @@ const RenderVacationRequests = () => {
         </Typography>
         <VacationRequestForm
           buttonLabel={strings.generic.apply}
-          onClick={() => { createVacationRequest(); }}
+          onClick={() => createVacationRequest()}
           vacationData={vacationRequest}
           setVacationData={setVacationRequest}
         />
@@ -322,19 +355,21 @@ const RenderVacationRequests = () => {
                     <TableCell>{ request.startDate.toDateString() }</TableCell>
                     <TableCell>{ request.endDate.toDateString() }</TableCell>
                     <TableCell>{ request.days }</TableCell>
-                    {statuses.map((status: VacationRequestStatus) => (
-                      <>
-                        {request.id === status.vacationRequestId &&
-                          <TableCell
-                            key={`status-${status.id}`}
-                            sx={{ "&.pending": { color: "#FF493C" }, "&.approved": { color: "#45cf36" } }}
-                            className={status.status === "APPROVED" ? "approved" : "pending"}
-                          >
-                            { handleRequestStatus(status.status) }
-                          </TableCell>
-                        }
-                      </>
-                    ))}
+                    {latestRequestStatuses.map(latestStatus => {
+                      return (
+                        <>
+                          {request.id === latestStatus.vacationRequestId &&
+                            <TableCell
+                              key={`status-${latestStatus.id}`}
+                              sx={{ "&.pending": { color: "#FF493C" }, "&.approved": { color: "#45cf36" } }}
+                              className={latestStatus.status === "APPROVED" ? "approved" : "pending"}
+                            >
+                              { handleRequestStatus(latestStatus.status) }
+                            </TableCell>
+                          }
+                        </>
+                      );
+                    })}
                     <TableCell>
                       <IconButton
                         aria-label="expand row"
